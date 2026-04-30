@@ -1,116 +1,101 @@
 # CHASE
 
-本仓库包含 CHASE 训练/评估代码（基于 GOP + dur/energy + Whisper 对齐特征），并支持多 seed 运行与结果汇总。
+本仓库包含 CHASE 的训练与评估代码。该项目基于 GOP、duration、energy 以及可选的 Whisper 对齐特征进行自动发音评估实验，并支持多 seed 训练与结果汇总。
 
 ## 目录结构
 
 ```text
 CHASE/
-  src/                # 训练脚本、模型、运行脚本、汇总脚本
-  data/               # 数据与（可选）Whisper 对齐特征
-  exp/                # 训练输出（result.csv、train.log、模型等）
-  figure/             # 画图/可视化（如有）
+  src/                # 训练脚本、模型文件、运行脚本、结果汇总脚本
+  data/               # GOP 特征、标签文件与对齐数据
+  exp/                # 训练输出目录，如 result.csv、train.log、模型权重等
+  figure/             # 图表或可视化结果
 ```
 
 ## 环境与依赖
 
 建议使用 Python 3.8+。
 
-安装依赖（最小集合）：
+安装依赖：
 
 ```bash
 pip install -r requirements.txt
 ```
 
 说明：
-- 需要 `torch`（CUDA 版本按你的机器自行安装/配置）
-- 需要 `scikit-learn`（用于 PCA）
+
+- 需要安装 `torch`，CUDA 版本请根据本机 GPU 环境自行配置。
+- 需要安装 `scikit-learn`，用于 PCA 等处理步骤。
 
 ## 数据准备
 
-训练脚本默认从项目内 `data/` 读取。
+训练脚本默认从项目内的 `data/` 目录读取数据。本仓库已提供 GOP 相关特征、标签文件和对齐后的 numpy 数据。由于文件体积限制，Whisper 对齐特征未随仓库上传。
 
-### 1) GOP/标签/对齐后的 numpy 数据
-
-根据 `--am` 选择不同子目录（默认 `librispeech`）：
+默认数据目录如下：
 
 ```text
 data/
-  seq_data_librispeech/
-    tr_feat.npy
-    te_feat.npy
-    tr_label_phn.npy
-    te_label_phn.npy
-    tr_label_utt.npy
-    te_label_utt.npy
-    tr_label_word.npy
-    te_label_word.npy
-    tr_word_id.npy
-    te_word_id.npy
+  raw_kaldi_gop/              # GOP 原始 CSV 文件及样本 key 文件
+  seq_data_librispeech/       # 训练/测试特征、标签、词级 ID、duration 与 energy 特征
 ```
 
-若你训练时用 `--am paiia` 或 `--am paiib`，则需要对应的 `data/seq_data_paiia/` 或 `data/seq_data_paiib/`。
+其中，`seq_data_librispeech/` 为默认使用的数据目录，对应训练参数：
 
-### 2) raw_kaldi_gop 的 key 文件（用于对齐 Whisper 特征文件名）
+```bash
+--am librispeech
+```
+
+如果使用其他声学模型名称，例如 `--am paiia` 或 `--am paiib`，则需要准备对应的数据目录：
 
 ```text
-data/
-  raw_kaldi_gop/
-    librispeech/
-      tr_keys_phn.csv
-      te_keys_phn.csv
+data/seq_data_paiia/
+data/seq_data_paiib/
 ```
 
-### 3) Whisper 对齐特征（可选）
+## Whisper 对齐特征（可选）
 
-默认位置（也可通过 `--whisper-feat-root` 覆盖）：
-
-```text
-data/
-  whisper_feature/
-    feature_aligned/
-      whisper_block25_features/
-        train/*.npy
-        test/*.npy
-```
-
-每个 `.npy` 通常是 `<sample_id>.npy`，形状期望为 `[T, 1280]`，脚本会按 GOP 序列长度 pad/截断。
-
-### 4) Whisper 逐维归一化统计
-
-默认文件（也可通过 `--whisper-stat-path` 覆盖）：
+Whisper 对齐特征未随本仓库上传。实验代码默认从以下路径读取 Whisper 相关文件：
 
 ```text
 data/whisper_feature.npz
 ```
 
-需包含 `mean`、`std`（可选 `count`）。
+如需完整的 Whisper 对齐特征文件以复现实验结果，请通过邮件联系作者获取。
+
+Contact: `your_email@example.com`
 
 ## 训练
 
 ### 单次训练
 
-在项目根目录：
+在项目根目录下运行：
 
 ```bash
 python src/train.py --exp-dir exp/seed3 --seed 3 --am librispeech
 ```
 
-输出会写入：
-- `exp/seed3/train.log`
-- `exp/seed3/result.csv`
-- `exp/seed3/best_audio_model.pth`
+训练输出将保存到：
 
-### 多 seed 批量训练（推荐）
+```text
+exp/seed3/
+  train.log
+  result.csv
+  best_audio_model.pth
+```
 
-脚本：`src/run.sh`
+### 多 seed 批量训练
 
-默认不带参数时：
-- seeds：`3 312 712 644 867`
-- GPU：`0`
+项目提供了多 seed 批量运行脚本：
 
 ```bash
 bash src/run.sh
+```
+
+默认设置为：
+
+```text
+seeds: 3 312 712 644 867
+GPU: 0
 ```
 
 指定 GPU：
@@ -125,26 +110,43 @@ bash src/run.sh --gpus 0,1,2,3
 bash src/run.sh 3 312 712 --gpus 0,1
 ```
 
-## 汇总 5 次 seed 最佳结果并取平均
+## 结果汇总
 
-脚本：`src/collect_summary.py`
-
-规则：
-- 每个 seed：在 `exp/seed{seed}/result.csv` 中选取 `phone_test_mse` 最低的 epoch 作为 best
-- 对 5 个 seed 的 best 行做 mean/std
-
-默认直接运行：
+项目提供了结果汇总脚本：
 
 ```bash
 python src/collect_summary.py
 ```
 
-输出（写到 `exp/` 下）：
-- `exp/result_best_by_phone_test_mse.csv`
-- `exp/result_best_mean_std.csv`
+默认规则为：
 
-## 备注（上传 GitHub 建议）
+- 对每个 seed，在 `exp/seed{seed}/result.csv` 中选择 `phone_test_mse` 最低的 epoch 作为最佳结果。
+- 对多个 seed 的最佳结果计算 mean 和 std。
 
-通常不建议把 `data/` 与 `exp/`（模型/特征/日志等大文件）直接提交到 GitHub。
-建议只提交代码，并在 README 说明数据如何获取/生成。
+输出文件保存到 `exp/` 目录下：
 
+```text
+exp/result_best_by_phone_test_mse.csv
+exp/result_best_mean_std.csv
+```
+
+## GitHub 文件说明
+
+本仓库上传了以下数据目录：
+
+```text
+data/raw_kaldi_gop/
+data/seq_data_librispeech/
+```
+
+以下 Whisper 相关文件未随仓库上传：
+
+```text
+data/whisper_feature.npz
+```
+
+如需 Whisper 对齐特征或完整复现实验所需的附加文件，请通过邮件联系作者获取。
+
+## License
+
+This project is released under the MIT License.
