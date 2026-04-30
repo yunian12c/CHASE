@@ -45,13 +45,6 @@ data/
 --am librispeech
 ```
 
-如果使用其他声学模型名称，例如 `--am paiia` 或 `--am paiib`，则需要准备对应的数据目录：
-
-```text
-data/seq_data_paiia/
-data/seq_data_paiib/
-```
-
 ## Whisper 对齐特征（可选）
 
 Whisper 对齐特征未随本仓库上传。实验代码默认从以下路径读取 Whisper 相关文件：
